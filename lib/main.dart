@@ -55,6 +55,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   bool showH = true;     // Horizontal (X)
   bool showD = true;     // Depth (Z)
   bool showDiag = true;  // Diagonal (45deg in XZ)
+  bool showP = false;    // Points (Vanishing Poles)
 
   double densityV = 2.0;
   double densityH = 2.0;
@@ -137,6 +138,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                   showH: showH,
                   showD: showD,
                   showDiag: showDiag,
+                  showP: showP,
                   yaw: yaw,
                   pitch: pitch,
                   fov: fov,
@@ -258,6 +260,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
               _buildToggle(Icons.waves, const Color(0xFFFF00FF), showH, (v) => setState(() => showH = v)),
               _buildToggle(Icons.waves, Colors.yellow, showD, (v) => setState(() => showD = v)),
               _buildToggle(Icons.waves, Colors.limeAccent, showDiag, (v) => setState(() => showDiag = v)),
+              _buildToggle(Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
             ],
           ),
           const SizedBox(height: 15),
@@ -526,7 +529,7 @@ class GridGeometryLayer {
 /// Renders the complex 2D curvilinear projections of the pre-computed 3D families.
 class CurvilinearPainter extends CustomPainter {
   final List<Float32List> linesV, linesH, linesD, linesDiag;
-  final bool showV, showH, showD, showDiag;
+  final bool showV, showH, showD, showDiag, showP;
   final double yaw, pitch, fov;
 
   CurvilinearPainter({
@@ -538,6 +541,7 @@ class CurvilinearPainter extends CustomPainter {
     required this.showH,
     required this.showD,
     required this.showDiag,
+    required this.showP,
     required this.yaw,
     required this.pitch,
     required this.fov,
@@ -569,6 +573,56 @@ class CurvilinearPainter extends CustomPainter {
     if (showH) _drawFamily(canvas, linesH, const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
     if (showD) _drawFamily(canvas, linesD, Colors.yellow, center, radius, maxTheta, vDir, right, trueUp);
     if (showDiag) _drawFamily(canvas, linesDiag, Colors.limeAccent, center, radius, maxTheta, vDir, right, trueUp);
+
+    if (showP) {
+      // Directions for primary axes and diagonal family
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 1, 0), vm.Vector3(0, -1, 0)], Colors.cyan, center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(1, 0, 0), vm.Vector3(-1, 0, 0)], const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 0, 1), vm.Vector3(0, 0, -1)], Colors.yellow, center, radius, maxTheta, vDir, right, trueUp);
+      
+      double invSqrt2 = 1.0 / math.sqrt2;
+      _drawVanishingPoints(canvas, [
+        vm.Vector3(invSqrt2, 0, invSqrt2), vm.Vector3(-invSqrt2, 0, -invSqrt2),
+        vm.Vector3(invSqrt2, 0, -invSqrt2), vm.Vector3(-invSqrt2, 0, invSqrt2),
+      ], Colors.limeAccent, center, radius, maxTheta, vDir, right, trueUp);
+    }
+  }
+
+  void _drawVanishingPoints(
+      Canvas canvas, List<vm.Vector3> directions, Color color, Offset center, 
+      double radius, double maxTheta, 
+      vm.Vector3 vDir, vm.Vector3 right, vm.Vector3 trueUp) {
+    
+    double rScale = radius / maxTheta;
+    double cx = center.dx, cy = center.dy;
+    
+    Paint pointPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+      
+    Paint glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8);
+
+    for (var dir in directions) {
+      double cosT = dir.dot(vDir);
+      if (cosT > 0.0) {
+        double theta = math.acos(cosT.clamp(-1.0, 1.0));
+        if (theta > maxTheta + 0.001) continue; // Boundary clip
+
+        double prX = dir.dot(right);
+        double prY = dir.dot(trueUp);
+        double sinT = math.sqrt(prX*prX + prY*prY);
+        
+        double r = theta * rScale;
+        double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
+        double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
+
+        canvas.drawCircle(Offset(outX, outY), 10, glowPaint);
+        canvas.drawCircle(Offset(outX, outY), 4, pointPaint);
+        canvas.drawCircle(Offset(outX, outY), 5, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1);
+      }
+    }
   }
 
   void _drawFamily(
@@ -692,7 +746,7 @@ class CurvilinearPainter extends CustomPainter {
     return oldDelegate.yaw != yaw || oldDelegate.pitch != pitch || oldDelegate.fov != fov ||
            oldDelegate.showV != showV || oldDelegate.showH != showH ||
            oldDelegate.showD != showD || oldDelegate.showDiag != showDiag ||
-           oldDelegate.linesV != linesV;
+           oldDelegate.showP != showP || oldDelegate.linesV != linesV;
   }
 }
 
