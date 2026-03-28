@@ -355,22 +355,28 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('FIELD OF VIEW', style: TextStyle(fontSize: 10, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        const Text('FIELD OF VIEW (CONE ANGLE)', style: TextStyle(fontSize: 10, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        const SizedBox(height: 5),
         Row(
           children: [
             const Icon(Icons.remove_red_eye_outlined, size: 16, color: Colors.white38),
             Expanded(
               child: Slider(
                 value: fov,
-                min: 60,
-                max: 180,
-                activeColor: Colors.white60,
+                min: 10,
+                max: 360,
+                activeColor: fov > 180 ? const Color(0xFF00E5FF) : Colors.white60,
                 onChanged: (v) => setState(() => fov = v),
               ),
             ),
             Text('${fov.toInt()}°', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
+        if (fov > 180) 
+          const Padding(
+            padding: EdgeInsets.only(left: 30),
+            child: Text('FULL-SPHERE MODE ACTIVE', style: TextStyle(fontSize: 9, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold, letterSpacing: 1)),
+          ),
       ],
     );
   }
@@ -458,11 +464,11 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                 const Text(
                   "Flocon & Barre's Curvilinear Perspective (1968) solves the distortion problems "
                   "found in standard linear perspective at high field-of-views.\n\n"
-                  "By mapping the visual sphere (the true shape of human peripheral vision) "
-                  "directly to a 2D plane through an Azimuthal Equidistant projection, straight 3D parallel "
-                  "lines correctly bow outwards exactly as they appear at the extreme limits of the eye.\n\n"
-                  "This app renders four infinite classical families of parallel lines. At 180° FOV, "
-                  "observe how lines perfectly envelope the hemispherical boundary without breaking.",
+                  "This application expands the geometry to a Full-Sphere 360° projection. "
+                  "Imagine a visual cone expanding from a point: at 180°, it covers the front hemisphere. "
+                  "Beyond 180°, it 'unzips' the space behind you, eventually packing the entire 360° "
+                  "universe into this circular disk. The center is your direct line of sight; "
+                  "the edge of the circle is the point exactly behind you.",
                   style: TextStyle(color: Colors.white70, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
@@ -694,23 +700,25 @@ class CurvilinearPainter extends CustomPainter {
 
     for (var dir in directions) {
       double cosT = dir.dot(vDir);
-      if (cosT > 0.0) {
-        double theta = math.acos(cosT.clamp(-1.0, 1.0));
-        // Boundary clip: use 0.05 epsilon to ensure poles at 180 FOV show on the very edge.
-        if (theta > maxTheta + 0.05) continue; 
+      // Removed Front-Hemisphere clipping (cosT > 0). 
+      // Points with cosT < 0 are behind the camera (theta > 90deg).
+      double theta = math.acos(cosT.clamp(-1.0, 1.0));
+      
+      // Boundary clip: Check if point is inside the user's defined cone (fov/2)
+      if (theta > maxTheta + 0.05) continue; 
 
-        double prX = dir.dot(right);
-        double prY = dir.dot(trueUp);
-        double sinT = math.sqrt(prX*prX + prY*prY);
-        
-        double r = theta * rScale;
-        double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
-        double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
+      double prX = dir.dot(right);
+      double prY = dir.dot(trueUp);
+      double sinT = math.sqrt(prX*prX + prY*prY);
+      
+      double r = theta * rScale;
+      // At the exact poles, sinT is 0. But for azimuthal projection, we maintain center for front and periphery for back.
+      double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
+      double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
 
-        canvas.drawCircle(Offset(outX, outY), 10, glowPaint);
-        canvas.drawCircle(Offset(outX, outY), 4, pointPaint);
-        canvas.drawCircle(Offset(outX, outY), 5, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1);
-      }
+      canvas.drawCircle(Offset(outX, outY), 10, glowPaint);
+      canvas.drawCircle(Offset(outX, outY), 4, pointPaint);
+      canvas.drawCircle(Offset(outX, outY), 5, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1);
     }
   }
 
@@ -733,7 +741,7 @@ class CurvilinearPainter extends CustomPainter {
       bool pathStarted = false;
       
       double lastPx = 0, lastPy = 0, lastPz = 0;
-      double lastCosT = 0;
+      double lastTheta = 0;
       
       // We leap by 3 (X,Y,Z structure)
       for (int i = 0; i < pts.length; i += 3) {
@@ -745,26 +753,23 @@ class CurvilinearPainter extends CustomPainter {
         if (distSq < 0.0001) continue; // Safety against origin singularity
         double dist = math.sqrt(distSq);
 
-        // Cosine of angle to camera direction dictates visibility (z-clipping)
-        // > 0 is visible. <= 0 means point is traversing the infinite bounds behind the eye.
+        // Cosine to determine angle from gaze
         double cosT = (px*vX + py*vY + pz*vZ) / dist;
+        double theta = math.acos(cosT.clamp(-1.0, 1.0));
 
-        if (cosT > 0.0) {
-          // --- Main Core Projection --- Flocon & Barre logic applied here
-          double theta = math.acos(cosT.clamp(-1.0, 1.0));
-          
+        if (theta <= maxTheta) {
           double prX = (px*rX + py*rY + pz*rZ) / dist;
           double prY = (px*uX + py*uY + pz*uZ) / dist;
           double sinT = math.sqrt(prX*prX + prY*prY);
           
           double r = theta * rScale;
           double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
-          double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0); // Y flipped for canvas
+          double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
 
           if (!pathStarted) {
-            // INTERPOLATION CRUCIAL FIX: Exact point clipping bridging entering the hemisphere
-            if (i > 0 && lastCosT <= 0.0) { 
-              double tInterp = lastCosT / (lastCosT - cosT);
+            // INTERPOLATION FIX: Crossing FOV boundary
+            if (i > 0 && lastTheta > maxTheta) { 
+              double tInterp = (maxTheta - lastTheta) / (theta - lastTheta);
               double edgePx = lastPx + (px - lastPx) * tInterp;
               double edgePy = lastPy + (py - lastPy) * tInterp;
               double edgePz = lastPz + (pz - lastPz) * tInterp;
@@ -774,7 +779,7 @@ class CurvilinearPainter extends CustomPainter {
               double ePrY = (edgePx*uX + edgePy*uY + edgePz*uZ) / eDist;
               double eSinT = math.sqrt(ePrX*ePrX + ePrY*ePrY);
               
-              double eR = (math.pi / 2.0) * rScale; // Bound entirely on the 180deg hemisphere limit edge
+              double eR = radius; // Bound on the frame edge
               double eOutX = cx + (eSinT > 0.0001 ? eR * (ePrX / eSinT) : 0);
               double eOutY = cy - (eSinT > 0.0001 ? eR * (ePrY / eSinT) : 0);
               path.moveTo(eOutX, eOutY);
@@ -785,10 +790,9 @@ class CurvilinearPainter extends CustomPainter {
           }
           path.lineTo(outX, outY);
         } else {
-          // Point is outside hemisphere.
+          // Outside current FOV boundary
           if (pathStarted) {
-            // INTERPOLATION CRUCIAL FIX: Smooth edge-bridge cleanly tracking line exiting out of bounds.
-            double tInterp = lastCosT / (lastCosT - cosT);
+            double tInterp = (maxTheta - lastTheta) / (theta - lastTheta);
             double edgePx = lastPx + (px - lastPx) * tInterp;
             double edgePy = lastPy + (py - lastPy) * tInterp;
             double edgePz = lastPz + (pz - lastPz) * tInterp;
@@ -798,7 +802,7 @@ class CurvilinearPainter extends CustomPainter {
             double ePrY = (edgePx*uX + edgePy*uY + edgePz*uZ) / eDist;
             double eSinT = math.sqrt(ePrX*ePrX + ePrY*ePrY);
             
-            double eR = (math.pi / 2.0) * rScale;
+            double eR = radius;
             double eOutX = cx + (eSinT > 0.0001 ? eR * (ePrX / eSinT) : 0);
             double eOutY = cy - (eSinT > 0.0001 ? eR * (ePrY / eSinT) : 0);
             path.lineTo(eOutX, eOutY);
@@ -807,7 +811,7 @@ class CurvilinearPainter extends CustomPainter {
         }
         
         lastPx = px; lastPy = py; lastPz = pz;
-        lastCosT = cosT;
+        lastTheta = theta;
       }
     }
 
