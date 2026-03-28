@@ -275,7 +275,26 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
             children: [
               Container(width: 4, height: 24, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 12),
-              Expanded(child: Text(title, style: TextStyle(color: isVisible ? Colors.white : Colors.white38, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showDensityInputDialog(title, density, (v) {
+                    setState(() {
+                      updateDensity(v);
+                      _regenerateGrid();
+                    });
+                  }),
+                  child: Row(
+                    children: [
+                      Text(title, style: TextStyle(color: isVisible ? Colors.white : Colors.white38, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${density.toStringAsFixed(1)})',
+                        style: TextStyle(color: isVisible ? color.withValues(alpha: 0.8) : Colors.white24, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Transform.scale(
                 scale: 0.8,
                 child: Switch(
@@ -378,6 +397,42 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
     );
   }
 
+  void _showDensityInputDialog(String title, double current, Function(double) onSubmitted) {
+    final controller = TextEditingController(text: current.toStringAsFixed(1));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E28),
+        title: Text('Input $title Spacing', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Value (0.1 - 20.0)',
+            labelStyle: TextStyle(color: Colors.white38),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00E5FF))),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL', style: TextStyle(color: Colors.white38))),
+          TextButton(
+            onPressed: () {
+              double? val = double.tryParse(controller.text);
+              if (val != null && val >= 0.1 && val <= 20.0) {
+                onSubmitted(val);
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('APPLY', style: TextStyle(color: Color(0xFF00E5FF))),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showInfoScreen(BuildContext context) {
     showDialog(
       context: context,
@@ -469,40 +524,49 @@ class GridGeometryLayer {
     }
 
     if (type == 0) { // Vertical (parallel to world Y)
-      for (double x = -maxBoxBoundary; x <= maxBoxBoundary; x += density) {
-        for (double z = -maxBoxBoundary; z <= maxBoxBoundary; z += density) {
+      int halfCount = (maxBoxBoundary / density).floor();
+      for (int i = -halfCount; i <= halfCount; i++) {
+        double x = i * density;
+        for (int j = -halfCount; j <= halfCount; j++) {
+          double z = j * density;
           var list = Float32List((tSteps + 1) * 3);
-          for(int i = 0; i <= tSteps; i++) {
-            double ty = projectT(-tRange + i * tStep);
-            list[i*3] = x;
-            list[i*3+1] = ty;
-            list[i*3+2] = z;
+          for(int k = 0; k <= tSteps; k++) {
+            double ty = projectT(-tRange + k * tStep);
+            list[k*3] = x;
+            list[k*3+1] = ty;
+            list[k*3+2] = z;
           }
           lines.add(list);
         }
       }
     } else if (type == 1) { // Horizontal (parallel to world X)
-      for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
-        for (double z = -maxBoxBoundary; z <= maxBoxBoundary; z += density) {
+      int halfCount = (maxBoxBoundary / density).floor();
+      for (int i = -halfCount; i <= halfCount; i++) {
+        double y = i * density;
+        for (int j = -halfCount; j <= halfCount; j++) {
+          double z = j * density;
           var list = Float32List((tSteps + 1) * 3);
-          for(int i = 0; i <= tSteps; i++) {
-            double tx = projectT(-tRange + i * tStep);
-            list[i*3] = tx;
-            list[i*3+1] = y;
-            list[i*3+2] = z;
+          for(int k = 0; k <= tSteps; k++) {
+            double tx = projectT(-tRange + k * tStep);
+            list[k*3] = tx;
+            list[k*3+1] = y;
+            list[k*3+2] = z;
           }
           lines.add(list);
         }
       }
     } else if (type == 2) { // Depth (parallel to world Z)
-      for (double x = -maxBoxBoundary; x <= maxBoxBoundary; x += density) {
-        for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
+      int halfCount = (maxBoxBoundary / density).floor();
+      for (int i = -halfCount; i <= halfCount; i++) {
+        double x = i * density;
+        for (int j = -halfCount; j <= halfCount; j++) {
+          double y = j * density;
           var list = Float32List((tSteps + 1) * 3);
-          for(int i = 0; i <= tSteps; i++) {
-            double tz = projectT(-tRange + i * tStep);
-            list[i*3] = x;
-            list[i*3+1] = y;
-            list[i*3+2] = tz;
+          for(int k = 0; k <= tSteps; k++) {
+            double tz = projectT(-tRange + k * tStep);
+            list[k*3] = x;
+            list[k*3+1] = y;
+            list[k*3+2] = tz;
           }
           lines.add(list);
         }
@@ -510,32 +574,37 @@ class GridGeometryLayer {
     } else if (type == 3) { // Diagonal 45° families inside XZ planes
       double diagSpacing = density * math.sqrt2;
       double diagBound = math.min(50.0 * math.sqrt2, diagSpacing * 20.0);
-      double diagTMin = -50.0 * math.sqrt2;
-      double diagTStep = ( 100.0 * math.sqrt2 ) / tSteps;
       double invSqrt2 = 1.0 / math.sqrt2;
 
+      int halfCountDiag = (diagBound / diagSpacing).floor();
+      int halfCountY = (maxBoxBoundary / density).floor();
+
       // First diagonal group: direction (1, 0, 1) normalized
-      for (double m = -diagBound; m <= diagBound; m += diagSpacing) {
-        for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
+      for (int i = -halfCountDiag; i <= halfCountDiag; i++) {
+        double m = i * diagSpacing;
+        for (int j = -halfCountY; j <= halfCountY; j++) {
+          double y = j * density;
           var list = Float32List((tSteps + 1) * 3);
-          for(int i = 0; i <= tSteps; i++) {
-            double t = projectT(-tRange + i * tStep) * math.sqrt2;
-            list[i*3] = m + t * invSqrt2;
-            list[i*3+1] = y;
-            list[i*3+2] = t * invSqrt2;
+          for(int k = 0; k <= tSteps; k++) {
+            double t = projectT(-tRange + k * tStep); // Removed math.sqrt2 extra factor here to keep t consistent
+            list[k*3] = m + t * invSqrt2;
+            list[k*3+1] = y;
+            list[k*3+2] = t * invSqrt2;
           }
           lines.add(list);
         }
       }
       // Second diagonal group: direction (1, 0, -1) normalized
-      for (double m = -diagBound; m <= diagBound; m += diagSpacing) {
-        for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
+      for (int i = -halfCountDiag; i <= halfCountDiag; i++) {
+        double m = i * diagSpacing;
+        for (int j = -halfCountY; j <= halfCountY; j++) {
+          double y = j * density;
           var list = Float32List((tSteps + 1) * 3);
-          for(int i = 0; i <= tSteps; i++) {
-            double t = projectT(-tRange + i * tStep) * math.sqrt2;
-            list[i*3] = m + t * invSqrt2;
-            list[i*3+1] = y;
-            list[i*3+2] = -t * invSqrt2;
+          for(int k = 0; k <= tSteps; k++) {
+            double t = projectT(-tRange + k * tStep);
+            list[k*3] = m + t * invSqrt2;
+            list[k*3+1] = y;
+            list[k*3+2] = -t * invSqrt2;
           }
           lines.add(list);
         }
@@ -627,7 +696,8 @@ class CurvilinearPainter extends CustomPainter {
       double cosT = dir.dot(vDir);
       if (cosT > 0.0) {
         double theta = math.acos(cosT.clamp(-1.0, 1.0));
-        if (theta > maxTheta + 0.001) continue; // Boundary clip
+        // Boundary clip: use 0.05 epsilon to ensure poles at 180 FOV show on the very edge.
+        if (theta > maxTheta + 0.05) continue; 
 
         double prX = dir.dot(right);
         double prY = dir.dot(trueUp);
