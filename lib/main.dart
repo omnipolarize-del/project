@@ -22,8 +22,8 @@ class CurviGridApp extends StatelessWidget {
         textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme),
         scaffoldBackgroundColor: const Color(0xFF050510), // Deep space black
         colorScheme: const ColorScheme.dark(
-          primary: Colors.cyan,
-          secondary: const Color(0xFFFF00FF),
+          primary: Color(0xFF00E5FF),
+          secondary: Color(0xFFFF00FF),
           surface: Color(0xFF1E1E28),
         ),
       ),
@@ -152,18 +152,24 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
           AnimatedPositioned(
             duration: const Duration(milliseconds: 400),
             curve: Curves.easeOutCubic,
-            bottom: _isPanelExpanded ? -50 : 20,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: _isPanelExpanded ? 0.0 : 1.0,
-                child: const Column(
-                  children: [
-                    Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white70, size: 30),
-                    Text('Swipe up for controls', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
+            left: _isPanelExpanded ? -50 : 20,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _isPanelExpanded ? 0.0 : 1.0,
+                  child: const RotatedBox(
+                    quarterTurns: 3,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white70, size: 30),
+                        Text('Swipe right for controls', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -204,14 +210,14 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
             )
           ),
 
-          // Sublayer 3: Draggable Control Panel
+          // Sublayer 3: Draggable Control Panel (Sidebar)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutCirc,
-            bottom: _isPanelExpanded ? 0 : -320,
-            left: 0,
-            right: 0,
-            height: 380, // strict height for smooth animation
+            left: _isPanelExpanded ? 0 : -280,
+            top: 0,
+            bottom: 0,
+            width: 300,
             child: _buildControlPanel(),
           ),
         ],
@@ -221,98 +227,67 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
 
   Widget _buildControlPanel() {
     return GestureDetector(
-      onVerticalDragUpdate: (details) {
-        if (details.primaryDelta! > 10 && _isPanelExpanded) {
+      onHorizontalDragUpdate: (details) {
+        if (details.primaryDelta! < -10 && _isPanelExpanded) {
           setState(() => _isPanelExpanded = false);
           HapticFeedback.lightImpact();
-        } else if (details.primaryDelta! < -10 && !_isPanelExpanded) {
+        } else if (details.primaryDelta! > 10 && !_isPanelExpanded) {
           setState(() => _isPanelExpanded = true);
           HapticFeedback.lightImpact();
         }
       },
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xD012121A), // Frosted glass darker modern minimal
+          color: Color(0xD012121A),
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(30), 
             topRight: Radius.circular(30),
+            bottomRight: Radius.circular(30),
           ),
-          boxShadow: [BoxShadow(color: Color(0xAA000000), blurRadius: 40, offset: Offset(0, -5))],
+          boxShadow: [BoxShadow(color: Color(0xAA000000), blurRadius: 40, offset: Offset(5, 0))],
         ),
-        padding: const EdgeInsets.fromLTRB(20, 15, 20, 30),
-        child: Column(
+        padding: const EdgeInsets.fromLTRB(15, 60, 15, 30),
+        child: Stack(
           children: [
-            // Draggable indicator handle
-            Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(5))),
-            const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-
-          // Switches row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildToggle(Icons.waves, Colors.cyan, showV, (v) => setState(() => showV = v)),
-              _buildToggle(Icons.waves, const Color(0xFFFF00FF), showH, (v) => setState(() => showH = v)),
-              _buildToggle(Icons.waves, Colors.yellow, showD, (v) => setState(() => showD = v)),
-              _buildToggle(Icons.waves, Colors.limeAccent, showDiag, (v) => setState(() => showDiag = v)),
-              _buildToggle(Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
-            ],
-          ),
-          const SizedBox(height: 15),
-
-          // Sliders
-          _buildDensitySlider('Vertical grid', Colors.cyan, densityV, (v) => densityV = v),
-          _buildDensitySlider('Horizontal grid', const Color(0xFFFF00FF), densityH, (v) => densityH = v),
-          _buildDensitySlider('Depth grid', Colors.yellow, densityD, (v) => densityD = v),
-          _buildDensitySlider('Diagonal grid', Colors.limeAccent, densityDiag, (v) => densityDiag = v),
-
-          Divider(color: Colors.white.withValues(alpha: 0.1)),
-          
-          // FOV Slider
-          Row(
-            children: [
-              const Icon(Icons.remove_red_eye_outlined, size: 20, color: Colors.white70),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Slider(
-                  value: fov,
-                  min: 60,
-                  max: 180,
-                  activeColor: Colors.white,
-                  onChanged: (v) => setState(() => fov = v),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('CONTROLS', style: TextStyle(letterSpacing: 4, fontSize: 12, color: Colors.white38, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                
+                // Master Toggle
+                _buildMasterToggle(),
+                const Divider(color: Colors.white10, height: 30),
+                
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        _buildFamilyControl('Vertical', const Color(0xFF00E5FF), showV, densityV, (v) => showV = v, (v) => densityV = v),
+                        _buildFamilyControl('Horizontal', const Color(0xFFFF00FF), showH, densityH, (v) => showH = v, (v) => densityH = v),
+                        _buildFamilyControl('Depth', const Color(0xFFFFD600), showD, densityD, (v) => showD = v, (v) => densityD = v),
+                        _buildFamilyControl('Diagonal', const Color(0xFF00FF41), showDiag, densityDiag, (v) => showDiag = v, (v) => densityDiag = v),
+                        
+                        const Divider(color: Colors.white10, height: 30),
+                        
+                        _buildToggleRow('Vanishing Points', Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
+                        
+                        const SizedBox(height: 20),
+                        _buildFOVControl(),
+                        
+                        const SizedBox(height: 30),
+                        _buildActionButtons(),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              SizedBox(width: 40, child: Text('${fov.toInt()}°', style: const TextStyle(fontWeight: FontWeight.bold))),
-            ],
-          ),
-
-          const SizedBox(height: 5),
-
-          // Action Buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton.icon(
-                onPressed: randomizeDensities,
-                icon: const Icon(Icons.shuffle, color: Colors.white70),
-                label: const Text('Randomize', style: TextStyle(color: Colors.white70)),
-              ),
-              OutlinedButton.icon(
-                onPressed: resetView,
-                icon: const Icon(Icons.center_focus_strong, color: Colors.white),
-                label: const Text('Reset View', style: TextStyle(color: Colors.white)),
-                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white30)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-                  ],
-                ),
+              ],
+            ),
+            // Draggable handle on the right
+            Positioned(
+              right: 0, top: 0, bottom: 0,
+              child: Center(
+                child: Container(width: 4, height: 40, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
               ),
             ),
           ],
@@ -321,49 +296,144 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
     );
   }
 
-  Widget _buildToggle(IconData icon, Color color, bool value, Function(bool) onChanged) {
-    return GestureDetector(
+  Widget _buildMasterToggle() {
+    bool allOn = showV && showH && showD && showDiag;
+    return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
-        onChanged(!value);
+        setState(() {
+          bool target = !allOn;
+          showV = showH = showD = showDiag = target;
+        });
+        HapticFeedback.mediumImpact();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: value ? color.withValues(alpha: 0.2) : Colors.transparent,
-          border: Border.all(color: value ? color : Colors.white24, width: 2),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Icon(icon, color: value ? color : Colors.white54, size: 28),
+      child: Row(
+        children: [
+          Icon(allOn ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20),
+          const SizedBox(width: 15),
+          const Expanded(child: Text('ALL GRIDS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+          Switch(
+            value: allOn,
+            onChanged: (v) {
+              setState(() {
+                showV = showH = showD = showDiag = v;
+              });
+            },
+            activeColor: const Color(0xFF00E5FF),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildDensitySlider(String title, Color color, double value, Function(double) updateValue) {
+  Widget _buildFamilyControl(String title, Color color, bool isVisible, double density, Function(bool) toggle, Function(double) updateDensity) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
         children: [
-          Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 15),
-          Expanded(
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6)),
+          Row(
+            children: [
+              Container(width: 4, height: 24, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 12),
+              Expanded(child: Text(title, style: TextStyle(color: isVisible ? Colors.white : Colors.white38, fontWeight: FontWeight.w600))),
+              Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                  value: isVisible,
+                  onChanged: (v) => setState(() => toggle(v)),
+                  activeColor: color,
+                ),
+              ),
+            ],
+          ),
+          if (isVisible)
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              ),
               child: Slider(
-                value: value,
+                value: density,
                 min: 0.1,
                 max: 10.0,
                 activeColor: color,
-                inactiveColor: color.withValues(alpha: 0.2),
-                onChangeEnd: (v) { updateValue(v); _regenerateGrid(); setState((){}); },
-                onChanged: (v) { setState(() => updateValue(v)); },
+                inactiveColor: color.withValues(alpha: 0.1),
+                onChangeEnd: (v) { updateDensity(v); _regenerateGrid(); setState((){}); },
+                onChanged: (v) { setState(() => updateDensity(v)); },
               ),
             ),
-          ),
-          SizedBox(width: 35, child: Text(value.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
+    );
+  }
+
+  Widget _buildToggleRow(String title, IconData icon, Color color, bool value, Function(bool) onChanged) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          children: [
+            Icon(icon, color: value ? color : Colors.white24, size: 20),
+            const SizedBox(width: 15),
+            Expanded(child: Text(title, style: TextStyle(color: value ? Colors.white : Colors.white38))),
+            Transform.scale(
+              scale: 0.8,
+              child: Switch(
+                value: value,
+                onChanged: (v) => onChanged(v),
+                activeColor: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFOVControl() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('FIELD OF VIEW', style: TextStyle(fontSize: 10, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        Row(
+          children: [
+            const Icon(Icons.remove_red_eye_outlined, size: 16, color: Colors.white38),
+            Expanded(
+              child: Slider(
+                value: fov,
+                min: 60,
+                max: 180,
+                activeColor: Colors.white60,
+                onChanged: (v) => setState(() => fov = v),
+              ),
+            ),
+            Text('${fov.toInt()}°', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextButton(
+            onPressed: randomizeDensities,
+            style: TextButton.styleFrom(foregroundColor: Colors.white54),
+            child: const Text('RANDOMIZE'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: resetView,
+            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white10), foregroundColor: Colors.white),
+            child: const Text('RESET'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -577,22 +647,22 @@ class CurvilinearPainter extends CustomPainter {
     // Map Max Theta boundaries (hemispherical limits inside the view frustum)
     double maxTheta = (fov / 2.0) * (math.pi / 180.0);
 
-    if (showV) _drawFamily(canvas, linesV, Colors.cyan, center, radius, maxTheta, vDir, right, trueUp);
+    if (showV) _drawFamily(canvas, linesV, const Color(0xFF00E5FF), center, radius, maxTheta, vDir, right, trueUp);
     if (showH) _drawFamily(canvas, linesH, const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
-    if (showD) _drawFamily(canvas, linesD, Colors.yellow, center, radius, maxTheta, vDir, right, trueUp);
-    if (showDiag) _drawFamily(canvas, linesDiag, Colors.limeAccent, center, radius, maxTheta, vDir, right, trueUp);
+    if (showD) _drawFamily(canvas, linesD, const Color(0xFFFFD600), center, radius, maxTheta, vDir, right, trueUp);
+    if (showDiag) _drawFamily(canvas, linesDiag, const Color(0xFF00FF41), center, radius, maxTheta, vDir, right, trueUp);
 
     if (showP) {
       // Directions for primary axes and diagonal family
-      _drawVanishingPoints(canvas, [vm.Vector3(0, 1, 0), vm.Vector3(0, -1, 0)], Colors.cyan, center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 1, 0), vm.Vector3(0, -1, 0)], const Color(0xFF00E5FF), center, radius, maxTheta, vDir, right, trueUp);
       _drawVanishingPoints(canvas, [vm.Vector3(1, 0, 0), vm.Vector3(-1, 0, 0)], const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
-      _drawVanishingPoints(canvas, [vm.Vector3(0, 0, 1), vm.Vector3(0, 0, -1)], Colors.yellow, center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 0, 1), vm.Vector3(0, 0, -1)], const Color(0xFFFFD600), center, radius, maxTheta, vDir, right, trueUp);
       
       double invSqrt2 = 1.0 / math.sqrt2;
       _drawVanishingPoints(canvas, [
         vm.Vector3(invSqrt2, 0, invSqrt2), vm.Vector3(-invSqrt2, 0, -invSqrt2),
         vm.Vector3(invSqrt2, 0, -invSqrt2), vm.Vector3(-invSqrt2, 0, invSqrt2),
-      ], Colors.limeAccent, center, radius, maxTheta, vDir, right, trueUp);
+      ], const Color(0xFF00FF41), center, radius, maxTheta, vDir, right, trueUp);
     }
   }
 
@@ -802,9 +872,9 @@ class GnomonPainter extends CustomPainter {
     
     // Z-Sort axes map so facing lines overlay correctly
     List<Map<String, dynamic>> axes = [
-      {'val': vm.Vector3(0, 1, 0), 'color': Colors.cyan},       // Y/Vertical
+      {'val': vm.Vector3(0, 1, 0), 'color': const Color(0xFF00E5FF)},       // Y/Vertical
       {'val': vm.Vector3(1, 0, 0), 'color': const Color(0xFFFF00FF)},    // X/Horizontal
-      {'val': vm.Vector3(0, 0, 1), 'color': Colors.yellow},     // Z/Depth
+      {'val': vm.Vector3(0, 0, 1), 'color': const Color(0xFFFFD600)},     // Z/Depth
     ];
     axes.sort((a, b) => (a['val'] as vm.Vector3).dot(vDir).compareTo((b['val'] as vm.Vector3).dot(vDir)));
     for (var a in axes) drawAxis(a['val'], a['color']);

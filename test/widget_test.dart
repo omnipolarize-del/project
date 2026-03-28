@@ -16,6 +16,6 @@ void main() {
     await tester.pumpWidget(const CurviGridApp());
 
     // Check for the initial interaction hint which is a visible Text widget.
-    expect(find.text('Swipe up for controls'), findsOneWidget);
+    expect(find.text('Swipe right for controls'), findsOneWidget);
   });
 }
