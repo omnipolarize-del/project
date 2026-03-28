@@ -41,7 +41,6 @@ class CurviGridHomePage extends StatefulWidget {
 
 class _CurviGridHomePageState extends State<CurviGridHomePage> {
   // --- View State ---
-  bool _isPanelExpanded = false;
   double yaw = 0.0;
   double pitch = 0.0;
   double _baseYaw = 0.0;
@@ -57,10 +56,10 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   bool showDiag = true;  // Diagonal (45deg in XZ)
   bool showP = false;    // Points (Vanishing Poles)
 
-  double densityV = 2.0;
-  double densityH = 2.0;
-  double densityD = 2.0;
-  double densityDiag = 2.0;
+  double densityV = 4.0;
+  double densityH = 4.0;
+  double densityD = 4.0;
+  double densityDiag = 4.0;
 
   // Cache object that pre-generates and holds the raw 3D lines
   late GridGeometryLayer layerManager;
@@ -91,11 +90,11 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
     HapticFeedback.selectionClick();
     final rand = math.Random();
     setState(() {
-      // Pick random densities between 0.5 and 5.0
-      densityV = 0.5 + rand.nextDouble() * 4.5;
-      densityH = 0.5 + rand.nextDouble() * 4.5;
-      densityD = 0.5 + rand.nextDouble() * 4.5;
-      densityDiag = 0.5 + rand.nextDouble() * 4.5;
+      // Pick random densities between 1.0 and 8.0
+      densityV = 1.0 + rand.nextDouble() * 7.0;
+      densityH = 1.0 + rand.nextDouble() * 7.0;
+      densityD = 1.0 + rand.nextDouble() * 7.0;
+      densityDiag = 1.0 + rand.nextDouble() * 7.0;
       _regenerateGrid();
     });
   }
@@ -103,122 +102,96 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: Row(
         children: [
-          // Sublayer 1: Deep space grid canvas & Touch handling
-          Positioned.fill(
-            child: GestureDetector(
-              onScaleStart: (details) {
-                _baseFov = fov;
-                _baseYaw = yaw;
-                _basePitch = pitch;
-              },
-              onScaleUpdate: (details) {
-                setState(() {
-                  // Pan gesture
-                  if (details.pointerCount == 1 || details.scale == 1.0) {
-                    yaw = _baseYaw - details.focalPointDelta.dx * 0.005;
-                    pitch = _basePitch + details.focalPointDelta.dy * 0.005;
-                    pitch = pitch.clamp(-math.pi / 2 + 0.01, math.pi / 2 - 0.01);
-                  } 
-                  // Pinch to zoom (FOV manipulation)
-                  else {
-                    fov = (_baseFov / details.scale).clamp(60.0, 180.0);
-                  }
-                });
-              },
-              onDoubleTap: resetView,
-              child: CustomPaint(
-                painter: CurvilinearPainter(
-                  linesV: layerManager.linesV,
-                  linesH: layerManager.linesH,
-                  linesD: layerManager.linesD,
-                  linesDiag: layerManager.linesDiag,
-                  showV: showV,
-                  showH: showH,
-                  showD: showD,
-                  showDiag: showDiag,
-                  showP: showP,
-                  yaw: yaw,
-                  pitch: pitch,
-                  fov: fov,
-                ),
-                child: Container(),
-              ),
-            ),
+          // Sublayer 3: Permanent Control Sidebar
+          Container(
+            width: 300,
+            child: _buildControlPanel(),
           ),
           
-          // Panel Expand Hint overlay (fade in when hidden)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutCubic,
-            left: _isPanelExpanded ? -50 : 20,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 300),
-                  opacity: _isPanelExpanded ? 0.0 : 1.0,
-                  child: const RotatedBox(
-                    quarterTurns: 3,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white70, size: 30),
-                        Text('Swipe right for controls', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      ],
+          // Sublayer 1: Deep space grid canvas & Touch handling
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onScaleStart: (details) {
+                      _baseFov = fov;
+                      _baseYaw = yaw;
+                      _basePitch = pitch;
+                    },
+                    onScaleUpdate: (details) {
+                      setState(() {
+                        // Pan gesture
+                        if (details.pointerCount == 1 || details.scale == 1.0) {
+                          yaw = _baseYaw - details.focalPointDelta.dx * 0.005;
+                          pitch = _basePitch + details.focalPointDelta.dy * 0.005;
+                          pitch = pitch.clamp(-math.pi / 2 + 0.01, math.pi / 2 - 0.01);
+                        } 
+                        // Pinch to zoom (FOV manipulation)
+                        else {
+                          fov = (_baseFov / details.scale).clamp(60.0, 180.0);
+                        }
+                      });
+                    },
+                    onDoubleTap: resetView,
+                    child: CustomPaint(
+                      painter: CurvilinearPainter(
+                        linesV: layerManager.linesV,
+                        linesH: layerManager.linesH,
+                        linesD: layerManager.linesD,
+                        linesDiag: layerManager.linesDiag,
+                        showV: showV,
+                        showH: showH,
+                        showD: showD,
+                        showDiag: showDiag,
+                        showP: showP,
+                        yaw: yaw,
+                        pitch: pitch,
+                        fov: fov,
+                      ),
+                      child: Container(),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          // Sublayer 2: Interactive orientation trackball (Gnomon)
-          Positioned(
-            top: 40,
-            right: 20,
-            child: GestureDetector(
-              onPanUpdate: (details) {
-                setState(() {
-                  yaw -= details.delta.dx * 0.01;
-                  pitch += details.delta.dy * 0.01;
-                  pitch = pitch.clamp(-math.pi / 2 + 0.01, math.pi / 2 - 0.01);
-                });
-              },
-              child: SizedBox(
-                width: 80,
-                height: 80,
-                child: CustomPaint(
-                  painter: GnomonPainter(yaw: yaw, pitch: pitch),
+                
+                // Gnomon
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        yaw -= details.delta.dx * 0.01;
+                        pitch += details.delta.dy * 0.01;
+                        pitch = pitch.clamp(-math.pi / 2 + 0.01, math.pi / 2 - 0.01);
+                      });
+                    },
+                    child: SizedBox(
+                      width: 80,
+                      height: 80,
+                      child: CustomPaint(
+                        painter: GnomonPainter(yaw: yaw, pitch: pitch),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                
+                // Info Button
+                Positioned(
+                  top: 40,
+                  left: 20,
+                  child: IconButton(
+                    icon: const Icon(Icons.menu_book_rounded, color: Colors.white70),
+                    onPressed: () { 
+                      HapticFeedback.lightImpact();
+                      _showInfoScreen(context);
+                    },
+                  )
+                ),
+              ],
             ),
-          ),
-          
-          // Floating Info Button
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(Icons.menu_book_rounded, color: Colors.white70),
-              onPressed: () { 
-                HapticFeedback.lightImpact();
-                _showInfoScreen(context);
-              },
-            )
-          ),
-
-          // Sublayer 3: Draggable Control Panel (Sidebar)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOutCirc,
-            left: _isPanelExpanded ? 0 : -280,
-            top: 0,
-            bottom: 0,
-            width: 300,
-            child: _buildControlPanel(),
           ),
         ],
       ),
@@ -226,72 +199,40 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   }
 
   Widget _buildControlPanel() {
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        if (details.primaryDelta! < -10 && _isPanelExpanded) {
-          setState(() => _isPanelExpanded = false);
-          HapticFeedback.lightImpact();
-        } else if (details.primaryDelta! > 10 && !_isPanelExpanded) {
-          setState(() => _isPanelExpanded = true);
-          HapticFeedback.lightImpact();
-        }
-      },
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xD012121A),
-          borderRadius: BorderRadius.only(
-            topRight: Radius.circular(30),
-            bottomRight: Radius.circular(30),
-          ),
-          boxShadow: [BoxShadow(color: Color(0xAA000000), blurRadius: 40, offset: Offset(5, 0))],
-        ),
-        padding: const EdgeInsets.fromLTRB(15, 60, 15, 30),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('CONTROLS', style: TextStyle(letterSpacing: 4, fontSize: 12, color: Colors.white38, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                
-                // Master Toggle
-                _buildMasterToggle(),
-                const Divider(color: Colors.white10, height: 30),
-                
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildFamilyControl('Vertical', const Color(0xFF00E5FF), showV, densityV, (v) => showV = v, (v) => densityV = v),
-                        _buildFamilyControl('Horizontal', const Color(0xFFFF00FF), showH, densityH, (v) => showH = v, (v) => densityH = v),
-                        _buildFamilyControl('Depth', const Color(0xFFFFD600), showD, densityD, (v) => showD = v, (v) => densityD = v),
-                        _buildFamilyControl('Diagonal', const Color(0xFF00FF41), showDiag, densityDiag, (v) => showDiag = v, (v) => densityDiag = v),
-                        
-                        const Divider(color: Colors.white10, height: 30),
-                        
-                        _buildToggleRow('Vanishing Points', Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
-                        
-                        const SizedBox(height: 20),
-                        _buildFOVControl(),
-                        
-                        const SizedBox(height: 30),
-                        _buildActionButtons(),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Draggable handle on the right
-            Positioned(
-              right: 0, top: 0, bottom: 0,
-              child: Center(
-                child: Container(width: 4, height: 40, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xD012121A),
+        border: Border(right: BorderSide(color: Colors.white10)),
+        boxShadow: [BoxShadow(color: Color(0xAA000000), blurRadius: 40, offset: Offset(5, 0))],
+      ),
+      padding: const EdgeInsets.fromLTRB(15, 60, 15, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('CONTROLS', style: TextStyle(letterSpacing: 4, fontSize: 12, color: Colors.white38, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          _buildMasterToggle(),
+          const Divider(color: Colors.white10, height: 30),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildFamilyControl('Vertical', const Color(0xFF00E5FF), showV, densityV, (v) => showV = v, (v) => densityV = v),
+                  _buildFamilyControl('Horizontal', const Color(0xFFFF00FF), showH, densityH, (v) => showH = v, (v) => densityH = v),
+                  _buildFamilyControl('Depth', const Color(0xFFFFD600), showD, densityD, (v) => showD = v, (v) => densityD = v),
+                  _buildFamilyControl('Diagonal', const Color(0xFF00FF41), showDiag, densityDiag, (v) => showDiag = v, (v) => densityDiag = v),
+                  const Divider(color: Colors.white10, height: 30),
+                  _buildToggleRow('Vanishing Points', Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
+                  const SizedBox(height: 20),
+                  _buildFOVControl(),
+                  const SizedBox(height: 30),
+                  _buildActionButtons(),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

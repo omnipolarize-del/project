@@ -15,7 +15,7 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const CurviGridApp());
 
-    // Check for the initial interaction hint which is a visible Text widget.
-    expect(find.text('Swipe right for controls'), findsOneWidget);
+    // Verify the sidebar controls header is visible.
+    expect(find.text('CONTROLS'), findsOneWidget);
   });
 }
