@@ -447,18 +447,24 @@ class GridGeometryLayer {
     
     // We sample straight 3D parameterized tracks.
     // Length: -50 to 50 world units. 200 points to keep bezier paths butter smooth.
-    int tSteps = 200;
-    double tMin = -50.0;
-    double tMax = 50.0;
-    double tStep = (tMax - tMin) / tSteps;
+    // Length: infinite mapping using tangent. 300 points for heavy detail at horizon.
+    int tSteps = 300;
+    double tRange = 1.0;
+    double tStep = (2.0 * tRange) / tSteps;
+
+    double projectT(double s) {
+      // Maps [-1, 1] to effectively [-500, 500] with high density near viewer
+      return 15.0 * math.tan(s * (math.pi / 2.05));
+    }
 
     if (type == 0) { // Vertical (parallel to world Y)
       for (double x = -maxBoxBoundary; x <= maxBoxBoundary; x += density) {
         for (double z = -maxBoxBoundary; z <= maxBoxBoundary; z += density) {
           var list = Float32List((tSteps + 1) * 3);
           for(int i = 0; i <= tSteps; i++) {
+            double ty = projectT(-tRange + i * tStep);
             list[i*3] = x;
-            list[i*3+1] = tMin + i * tStep;
+            list[i*3+1] = ty;
             list[i*3+2] = z;
           }
           lines.add(list);
@@ -469,7 +475,8 @@ class GridGeometryLayer {
         for (double z = -maxBoxBoundary; z <= maxBoxBoundary; z += density) {
           var list = Float32List((tSteps + 1) * 3);
           for(int i = 0; i <= tSteps; i++) {
-            list[i*3] = tMin + i * tStep;
+            double tx = projectT(-tRange + i * tStep);
+            list[i*3] = tx;
             list[i*3+1] = y;
             list[i*3+2] = z;
           }
@@ -481,9 +488,10 @@ class GridGeometryLayer {
         for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
           var list = Float32List((tSteps + 1) * 3);
           for(int i = 0; i <= tSteps; i++) {
+            double tz = projectT(-tRange + i * tStep);
             list[i*3] = x;
             list[i*3+1] = y;
-            list[i*3+2] = tMin + i * tStep;
+            list[i*3+2] = tz;
           }
           lines.add(list);
         }
@@ -500,7 +508,7 @@ class GridGeometryLayer {
         for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
           var list = Float32List((tSteps + 1) * 3);
           for(int i = 0; i <= tSteps; i++) {
-            double t = diagTMin + i * diagTStep;
+            double t = projectT(-tRange + i * tStep) * math.sqrt2;
             list[i*3] = m + t * invSqrt2;
             list[i*3+1] = y;
             list[i*3+2] = t * invSqrt2;
@@ -513,7 +521,7 @@ class GridGeometryLayer {
         for (double y = -maxBoxBoundary; y <= maxBoxBoundary; y += density) {
           var list = Float32List((tSteps + 1) * 3);
           for(int i = 0; i <= tSteps; i++) {
-            double t = diagTMin + i * diagTStep;
+            double t = projectT(-tRange + i * tStep) * math.sqrt2;
             list[i*3] = m + t * invSqrt2;
             list[i*3+1] = y;
             list[i*3+2] = -t * invSqrt2;
