@@ -1,0 +1,16 @@
+name: curvi_grid
+description: An interactive 180-degree curvilinear perspective visualizer.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Essential dependency for 3D spatial calculations and transforms
+  vector_math: ^2.1.4
+
+flutter:
+  uses-material-design: true
