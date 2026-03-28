@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 
 void main() {
@@ -17,10 +19,11 @@ class CurviGridApp extends StatelessWidget {
     return MaterialApp(
       title: 'CurviGrid',
       theme: ThemeData.dark(useMaterial3: true).copyWith(
+        textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme),
         scaffoldBackgroundColor: const Color(0xFF050510), // Deep space black
         colorScheme: const ColorScheme.dark(
           primary: Colors.cyan,
-          secondary: Colors.magenta,
+          secondary: const Color(0xFFFF00FF),
           surface: Color(0xFF1E1E28),
         ),
       ),
@@ -38,6 +41,7 @@ class CurviGridHomePage extends StatefulWidget {
 
 class _CurviGridHomePageState extends State<CurviGridHomePage> {
   // --- View State ---
+  bool _isPanelExpanded = false;
   double yaw = 0.0;
   double pitch = 0.0;
   double _baseYaw = 0.0;
@@ -74,6 +78,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   }
 
   void resetView() {
+    HapticFeedback.selectionClick();
     setState(() {
       yaw = 0.0;
       pitch = 0.0;
@@ -82,6 +87,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   }
 
   void randomizeDensities() {
+    HapticFeedback.selectionClick();
     final rand = math.Random();
     setState(() {
       // Pick random densities between 0.5 and 5.0
@@ -139,6 +145,27 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
               ),
             ),
           ),
+          
+          // Panel Expand Hint overlay (fade in when hidden)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            bottom: _isPanelExpanded ? -50 : 20,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _isPanelExpanded ? 0.0 : 1.0,
+                child: const Column(
+                  children: [
+                    Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white70, size: 30),
+                    Text('Swipe up for controls', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
           // Sublayer 2: Interactive orientation trackball (Gnomon)
           Positioned(
@@ -168,15 +195,21 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
             left: 20,
             child: IconButton(
               icon: const Icon(Icons.menu_book_rounded, color: Colors.white70),
-              onPressed: () => _showInfoScreen(context),
+              onPressed: () { 
+                HapticFeedback.lightImpact();
+                _showInfoScreen(context);
+              },
             )
           ),
 
           // Sublayer 3: Draggable Control Panel
-          Positioned(
-            bottom: 0,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCirc,
+            bottom: _isPanelExpanded ? 0 : -320,
             left: 0,
             right: 0,
+            height: 380, // strict height for smooth animation
             child: _buildControlPanel(),
           ),
         ],
@@ -185,29 +218,44 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   }
 
   Widget _buildControlPanel() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xDD1E1E28), // Frosted glass dark look
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(30), 
-          topRight: Radius.circular(30),
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        if (details.primaryDelta! > 10 && _isPanelExpanded) {
+          setState(() => _isPanelExpanded = false);
+          HapticFeedback.lightImpact();
+        } else if (details.primaryDelta! < -10 && !_isPanelExpanded) {
+          setState(() => _isPanelExpanded = true);
+          HapticFeedback.lightImpact();
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xD012121A), // Frosted glass darker modern minimal
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(30), 
+            topRight: Radius.circular(30),
+          ),
+          boxShadow: [BoxShadow(color: Color(0xAA000000), blurRadius: 40, offset: Offset(0, -5))],
         ),
-        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 15, 20, 30),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Draggable indicator
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 15),
+        padding: const EdgeInsets.fromLTRB(20, 15, 20, 30),
+        child: Column(
+          children: [
+            // Draggable indicator handle
+            Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(5))),
+            const SizedBox(height: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
 
           // Switches row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildToggle(Icons.waves, Colors.cyan, showV, (v) => setState(() => showV = v)),
-              _buildToggle(Icons.waves, Colors.magenta, showH, (v) => setState(() => showH = v)),
+              _buildToggle(Icons.waves, const Color(0xFFFF00FF), showH, (v) => setState(() => showH = v)),
               _buildToggle(Icons.waves, Colors.yellow, showD, (v) => setState(() => showD = v)),
               _buildToggle(Icons.waves, Colors.limeAccent, showDiag, (v) => setState(() => showDiag = v)),
             ],
@@ -216,11 +264,11 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
 
           // Sliders
           _buildDensitySlider('Vertical grid', Colors.cyan, densityV, (v) => densityV = v),
-          _buildDensitySlider('Horizontal grid', Colors.magenta, densityH, (v) => densityH = v),
+          _buildDensitySlider('Horizontal grid', const Color(0xFFFF00FF), densityH, (v) => densityH = v),
           _buildDensitySlider('Depth grid', Colors.yellow, densityD, (v) => densityD = v),
           _buildDensitySlider('Diagonal grid', Colors.limeAccent, densityDiag, (v) => densityDiag = v),
 
-          Divider(color: Colors.white.withOpacity(0.1)),
+          Divider(color: Colors.white.withValues(alpha: 0.1)),
           
           // FOV Slider
           Row(
@@ -236,7 +284,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                   onChanged: (v) => setState(() => fov = v),
                 ),
               ),
-              Text('${fov.toInt()}°', style: const TextStyle(fontWeight: FontWeight.bold, width: 40)),
+              SizedBox(width: 40, child: Text('${fov.toInt()}°', style: const TextStyle(fontWeight: FontWeight.bold))),
             ],
           ),
 
@@ -258,20 +306,29 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white30)),
               ),
             ],
-          )
-        ],
+          ),
+          const SizedBox(height: 5),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildToggle(IconData icon, Color color, bool value, Function(bool) onChanged) {
     return GestureDetector(
-      onTap: () => onChanged(!value),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onChanged(!value);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: value ? color.withOpacity(0.2) : Colors.transparent,
+          color: value ? color.withValues(alpha: 0.2) : Colors.transparent,
           border: Border.all(color: value ? color : Colors.white24, width: 2),
           borderRadius: BorderRadius.circular(15),
         ),
@@ -295,13 +352,13 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                 min: 0.1,
                 max: 10.0,
                 activeColor: color,
-                inactiveColor: color.withOpacity(0.2),
+                inactiveColor: color.withValues(alpha: 0.2),
                 onChangeEnd: (v) { updateValue(v); _regenerateGrid(); setState((){}); },
                 onChanged: (v) { setState(() => updateValue(v)); },
               ),
             ),
           ),
-          Text(value.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold, width: 35)),
+          SizedBox(width: 35, child: Text(value.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -310,26 +367,49 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   void _showInfoScreen(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E28),
-        title: const Text('Curvilinear Perspective'),
-        content: const SingleChildScrollView(
-          child: Text(
-            "Flocon & Barre's Curvilinear Perspective (1968) solves the distortion problems "
-            "found in standard linear perspective at high field-of-views.\n\n"
-            "By mapping the visual sphere (the true shape of human peripheral vision) "
-            "directly to a 2D plane through an Azimuthal Equidistant projection, straight 3D parallel "
-            "lines correctly bow outwards exactly as they appear at the extreme limits of the eye.\n\n"
-            "This app renders four infinite classical families of parallel lines. At 180° FOV, "
-            "observe how lines perfectly envelope the hemispherical boundary without breaking."
+      builder: (ctx) => BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: const Color(0xD012121A),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.explore, size: 50, color: Colors.cyan),
+                const SizedBox(height: 20),
+                const Text('Curvilinear Perspective', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 15),
+                const Text(
+                  "Flocon & Barre's Curvilinear Perspective (1968) solves the distortion problems "
+                  "found in standard linear perspective at high field-of-views.\n\n"
+                  "By mapping the visual sphere (the true shape of human peripheral vision) "
+                  "directly to a 2D plane through an Azimuthal Equidistant projection, straight 3D parallel "
+                  "lines correctly bow outwards exactly as they appear at the extreme limits of the eye.\n\n"
+                  "This app renders four infinite classical families of parallel lines. At 180° FOV, "
+                  "observe how lines perfectly envelope the hemispherical boundary without breaking.",
+                  style: TextStyle(color: Colors.white70, height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 25),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white12, foregroundColor: Colors.white),
+                  child: const Text('Close'),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(ctx).pop();
+                  },
+                )
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            child: const Text('Close'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          )
-        ],
       ),
     );
   }
@@ -486,7 +566,7 @@ class CurvilinearPainter extends CustomPainter {
     double maxTheta = (fov / 2.0) * (math.pi / 180.0);
 
     if (showV) _drawFamily(canvas, linesV, Colors.cyan, center, radius, maxTheta, vDir, right, trueUp);
-    if (showH) _drawFamily(canvas, linesH, Colors.magenta, center, radius, maxTheta, vDir, right, trueUp);
+    if (showH) _drawFamily(canvas, linesH, const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
     if (showD) _drawFamily(canvas, linesD, Colors.yellow, center, radius, maxTheta, vDir, right, trueUp);
     if (showDiag) _drawFamily(canvas, linesDiag, Colors.limeAccent, center, radius, maxTheta, vDir, right, trueUp);
   }
@@ -600,7 +680,7 @@ class CurvilinearPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0
       ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 2.0)
-      ..color = color.withOpacity(0.5)
+      ..color = color.withValues(alpha: 0.5)
       ..isAntiAlias = true;
 
     canvas.drawPath(path, glowPaint);
@@ -661,7 +741,7 @@ class GnomonPainter extends CustomPainter {
     // Z-Sort axes map so facing lines overlay correctly
     List<Map<String, dynamic>> axes = [
       {'val': vm.Vector3(0, 1, 0), 'color': Colors.cyan},       // Y/Vertical
-      {'val': vm.Vector3(1, 0, 0), 'color': Colors.magenta},    // X/Horizontal
+      {'val': vm.Vector3(1, 0, 0), 'color': const Color(0xFFFF00FF)},    // X/Horizontal
       {'val': vm.Vector3(0, 0, 1), 'color': Colors.yellow},     // Z/Depth
     ];
     axes.sort((a, b) => (a['val'] as vm.Vector3).dot(vDir).compareTo((b['val'] as vm.Vector3).dot(vDir)));
