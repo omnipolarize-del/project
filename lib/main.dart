@@ -61,6 +61,10 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
   double densityD = 4.0;
   double densityDiag = 4.0;
 
+  bool showEquator = true;
+  bool showMeridian = false;
+  bool showHorizon = false;
+
   // Cache object that pre-generates and holds the raw 3D lines
   late GridGeometryLayer layerManager;
 
@@ -131,7 +135,7 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                         } 
                         // Pinch to zoom (FOV manipulation)
                         else {
-                          fov = (_baseFov / details.scale).clamp(60.0, 180.0);
+                          fov = (_baseFov / details.scale).clamp(10.0, 360.0);
                         }
                       });
                     },
@@ -150,6 +154,9 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
                         yaw: yaw,
                         pitch: pitch,
                         fov: fov,
+                        showEquator: showEquator,
+                        showMeridian: showMeridian,
+                        showHorizon: showHorizon,
                       ),
                       child: Container(),
                     ),
@@ -218,13 +225,21 @@ class _CurviGridHomePageState extends State<CurviGridHomePage> {
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
-                  _buildFamilyControl('Vertical', const Color(0xFF00E5FF), showV, densityV, (v) => showV = v, (v) => densityV = v),
-                  _buildFamilyControl('Horizontal', const Color(0xFFFF00FF), showH, densityH, (v) => showH = v, (v) => densityH = v),
-                  _buildFamilyControl('Depth', const Color(0xFFFFD600), showD, densityD, (v) => showD = v, (v) => densityD = v),
-                  _buildFamilyControl('Diagonal', const Color(0xFF00FF41), showDiag, densityDiag, (v) => showDiag = v, (v) => densityDiag = v),
+                  _buildFamilyControl('Vertical', const Color(0xFF40E9FF), showV, densityV, (v) => setState(() => showV = v), (v) => densityV = v),
+                  _buildFamilyControl('Horizontal', const Color(0xFFFF40FF), showH, densityH, (v) => setState(() => showH = v), (v) => densityH = v),
+                  _buildFamilyControl('Depth', const Color(0xFFFFE040), showD, densityD, (v) => setState(() => showD = v), (v) => densityD = v),
+                  _buildFamilyControl('Diagonal', const Color(0xFF40FF70), showDiag, densityDiag, (v) => setState(() => showDiag = v), (v) => densityDiag = v),
                   const Divider(color: Colors.white10, height: 30),
-                  _buildToggleRow('Vanishing Points', Icons.lens, Colors.white, showP, (v) => setState(() => showP = v)),
-                  const SizedBox(height: 20),
+                  _buildToggleRow('Vanishing Points', Icons.lens, Colors.white70, showP, (v) => setState(() => showP = v)),
+
+                  const SizedBox(height: 25),
+                  const Text('REFERENCE CIRCLES', style: TextStyle(letterSpacing: 2, fontSize: 10, color: Colors.white38, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+                  _buildToggleRow('Equator (BOLD)', Icons.circle_outlined, Colors.white, showEquator, (v) => setState(() => showEquator = v)),
+                  _buildToggleRow('Prime Meridian', Icons.unfold_more, Colors.white70, showMeridian, (v) => setState(() => showMeridian = v)),
+                  _buildToggleRow('Horizon', Icons.unfold_less, Colors.white70, showHorizon, (v) => setState(() => showHorizon = v)),
+
+                  const SizedBox(height: 30),
                   _buildFOVControl(),
                   const SizedBox(height: 30),
                   _buildActionButtons(),
@@ -625,6 +640,7 @@ class CurvilinearPainter extends CustomPainter {
   final List<Float32List> linesV, linesH, linesD, linesDiag;
   final bool showV, showH, showD, showDiag, showP;
   final double yaw, pitch, fov;
+  final bool showEquator, showMeridian, showHorizon;
 
   CurvilinearPainter({
     required this.linesV,
@@ -639,6 +655,9 @@ class CurvilinearPainter extends CustomPainter {
     required this.yaw,
     required this.pitch,
     required this.fov,
+    required this.showEquator,
+    required this.showMeridian,
+    required this.showHorizon,
   });
 
   @override
@@ -663,23 +682,89 @@ class CurvilinearPainter extends CustomPainter {
     // Map Max Theta boundaries (hemispherical limits inside the view frustum)
     double maxTheta = (fov / 2.0) * (math.pi / 180.0);
 
-    if (showV) _drawFamily(canvas, linesV, const Color(0xFF00E5FF), center, radius, maxTheta, vDir, right, trueUp);
-    if (showH) _drawFamily(canvas, linesH, const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
-    if (showD) _drawFamily(canvas, linesD, const Color(0xFFFFD600), center, radius, maxTheta, vDir, right, trueUp);
-    if (showDiag) _drawFamily(canvas, linesDiag, const Color(0xFF00FF41), center, radius, maxTheta, vDir, right, trueUp);
+    if (showV) _drawFamily(canvas, linesV, const Color(0xFF40E9FF), center, radius, maxTheta, vDir, right, trueUp);
+    if (showH) _drawFamily(canvas, linesH, const Color(0xFFFF40FF), center, radius, maxTheta, vDir, right, trueUp);
+    if (showD) _drawFamily(canvas, linesD, const Color(0xFFFFE040), center, radius, maxTheta, vDir, right, trueUp);
+    if (showDiag) _drawFamily(canvas, linesDiag, const Color(0xFF40FF70), center, radius, maxTheta, vDir, right, trueUp);
+
+    _drawReferenceCircles(canvas, center, radius, maxTheta, vDir, right, trueUp);
 
     if (showP) {
       // Directions for primary axes and diagonal family
-      _drawVanishingPoints(canvas, [vm.Vector3(0, 1, 0), vm.Vector3(0, -1, 0)], const Color(0xFF00E5FF), center, radius, maxTheta, vDir, right, trueUp);
-      _drawVanishingPoints(canvas, [vm.Vector3(1, 0, 0), vm.Vector3(-1, 0, 0)], const Color(0xFFFF00FF), center, radius, maxTheta, vDir, right, trueUp);
-      _drawVanishingPoints(canvas, [vm.Vector3(0, 0, 1), vm.Vector3(0, 0, -1)], const Color(0xFFFFD600), center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 1, 0), vm.Vector3(0, -1, 0)], const Color(0xFF40E9FF), center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(1, 0, 0), vm.Vector3(-1, 0, 0)], const Color(0xFFFF40FF), center, radius, maxTheta, vDir, right, trueUp);
+      _drawVanishingPoints(canvas, [vm.Vector3(0, 0, 1), vm.Vector3(0, 0, -1)], const Color(0xFFFFE040), center, radius, maxTheta, vDir, right, trueUp);
       
       double invSqrt2 = 1.0 / math.sqrt2;
       _drawVanishingPoints(canvas, [
         vm.Vector3(invSqrt2, 0, invSqrt2), vm.Vector3(-invSqrt2, 0, -invSqrt2),
         vm.Vector3(invSqrt2, 0, -invSqrt2), vm.Vector3(-invSqrt2, 0, invSqrt2),
-      ], const Color(0xFF00FF41), center, radius, maxTheta, vDir, right, trueUp);
+      ], const Color(0xFF40FF70), center, radius, maxTheta, vDir, right, trueUp);
     }
+  }
+
+  void _drawReferenceCircles(Canvas canvas, Offset center, double radius, double maxTheta, vm.Vector3 vDir, vm.Vector3 right, vm.Vector3 trueUp) {
+    // Equator: Plane perpendicular to gaze (divides Front/Back) 
+    if (showEquator) {
+      _drawGreatCircle(canvas, vDir, right, trueUp, right, trueUp, center, radius, maxTheta, Colors.white, 3.0);
+    }
+    // Prime Meridian: Vertical plane through gaze (divides Left/Right)
+    if (showMeridian) {
+      _drawGreatCircle(canvas, right, vDir, trueUp, right, trueUp, center, radius, maxTheta, Colors.white70, 1.5);
+    }
+    // Horizon: Horizontal plane through gaze (divides Up/Down)
+    if (showHorizon) {
+      _drawGreatCircle(canvas, trueUp, vDir, right, right, trueUp, center, radius, maxTheta, Colors.white70, 1.5);
+    }
+  }
+
+  void _drawGreatCircle(Canvas canvas, vm.Vector3 normal, vm.Vector3 e1, vm.Vector3 e2, vm.Vector3 right, vm.Vector3 trueUp, Offset center, double radius, double maxTheta, Color color, double strokeWidth) {
+    Path path = Path();
+    double rScale = radius / maxTheta;
+    bool started = false;
+    
+    // We sample 120 points for a smooth great circle
+    const int segments = 120;
+    for (int i = 0; i <= segments; i++) {
+       double angle = (i / segments) * 2 * math.pi;
+       vm.Vector3 p = (e1 * math.cos(angle)) + (e2 * math.sin(angle));
+
+       // Use the current gaze direction to determine if point is within FOV
+       vm.Vector3 currentGaze = vm.Vector3(
+         math.sin(yaw) * math.cos(pitch),
+         math.sin(pitch),
+         math.cos(yaw) * math.cos(pitch)
+       ).normalized();
+       
+       double cosT = p.dot(currentGaze); 
+       double theta = math.acos(cosT.clamp(-1.0, 1.0));
+       if (theta <= maxTheta + 0.001) {
+          // Re-project based on the passed basis vectors
+          double prX = p.dot(right);
+          double prY = p.dot(trueUp);
+          double sinT = math.sqrt(prX*prX + prY*prY);
+          
+          double r = theta * rScale;
+          double factor = (sinT > 0.000001) ? (r / sinT) : 0;
+          double outX = center.dx + prX * factor;
+          double outY = center.dy - prY * factor;
+          
+          if (!started) {
+            path.moveTo(outX, outY);
+            started = true;
+          } else {
+            path.lineTo(outX, outY);
+          }
+       } else {
+          started = false; 
+       }
+    }
+
+    canvas.drawPath(path, Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..isAntiAlias = true);
   }
 
   void _drawVanishingPoints(
@@ -712,9 +797,10 @@ class CurvilinearPainter extends CustomPainter {
       double sinT = math.sqrt(prX*prX + prY*prY);
       
       double r = theta * rScale;
-      // At the exact poles, sinT is 0. But for azimuthal projection, we maintain center for front and periphery for back.
-      double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
-      double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
+      // At the exact poles, sinT is 0. But for azimuthal projection, we maintain direction stability.
+      double factor = (sinT > 0.000001) ? (r / sinT) : 0;
+      double outX = cx + prX * factor;
+      double outY = cy - prY * factor;
 
       canvas.drawCircle(Offset(outX, outY), 10, glowPaint);
       canvas.drawCircle(Offset(outX, outY), 4, pointPaint);
@@ -763,8 +849,9 @@ class CurvilinearPainter extends CustomPainter {
           double sinT = math.sqrt(prX*prX + prY*prY);
           
           double r = theta * rScale;
-          double outX = cx + (sinT > 0.0001 ? r * (prX / sinT) : 0);
-          double outY = cy - (sinT > 0.0001 ? r * (prY / sinT) : 0);
+          double factor = (sinT > 0.000001) ? (r / sinT) : 0;
+          double outX = cx + prX * factor;
+          double outY = cy - prY * factor;
 
           if (!pathStarted) {
             // INTERPOLATION FIX: Crossing FOV boundary
@@ -780,8 +867,9 @@ class CurvilinearPainter extends CustomPainter {
               double eSinT = math.sqrt(ePrX*ePrX + ePrY*ePrY);
               
               double eR = radius; // Bound on the frame edge
-              double eOutX = cx + (eSinT > 0.0001 ? eR * (ePrX / eSinT) : 0);
-              double eOutY = cy - (eSinT > 0.0001 ? eR * (ePrY / eSinT) : 0);
+              double eFactor = (eSinT > 0.000001) ? (eR / eSinT) : 0;
+              double eOutX = cx + ePrX * eFactor;
+              double eOutY = cy - ePrY * eFactor;
               path.moveTo(eOutX, eOutY);
             } else {
               path.moveTo(outX, outY);
@@ -803,8 +891,9 @@ class CurvilinearPainter extends CustomPainter {
             double eSinT = math.sqrt(ePrX*ePrX + ePrY*ePrY);
             
             double eR = radius;
-            double eOutX = cx + (eSinT > 0.0001 ? eR * (ePrX / eSinT) : 0);
-            double eOutY = cy - (eSinT > 0.0001 ? eR * (ePrY / eSinT) : 0);
+            double eFactor = (eSinT > 0.000001) ? (eR / eSinT) : 0;
+            double eOutX = cx + ePrX * eFactor;
+            double eOutY = cy - ePrY * eFactor;
             path.lineTo(eOutX, eOutY);
             pathStarted = false;
           }
